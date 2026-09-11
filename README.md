@@ -12,6 +12,7 @@ license material (77 upstream files total). The snapshot is pinned to radare2
 commit `596397d15faaa4decd7367a79e1b8f1a5cc28451`.
 
 - [Provenance, layout, and build boundary](libr_cons/UPSTREAM.md)
+- [Reading notes: code observations and possible relevance](notes/libr_cons.md)
 - [Per-file source manifest and checksums](libr_cons/SOURCE_MANIFEST.json)
 - [Reproducible importer](%5F/import_libr_cons.py)
 - [Original investigation and discussion links](https://github.com/isomorphisms/icurses/issues/1)
