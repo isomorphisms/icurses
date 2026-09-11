@@ -1,0 +1,98 @@
+/* radare - LGPL - Copyright 2007-2025 - pancake */
+
+#define R_LOG_ORIGIN "line"
+
+#include <r_cons.h>
+
+R_API RLine *r_line_new(RCons *cons) {
+	RLine *line = R_NEW0 (RLine);
+	line->cons = cons;
+	line->state.prompt = strdup ("> ");
+	line->hist_size = R_LINE_HISTSIZE;
+	line->kill_ring = r_list_newf (free);
+	line->kill_ring_ptr = -1;
+#if R2__WINDOWS__
+	line->vtmode = win_is_vtcompat (cons);
+#else
+	line->vtmode = 2;
+#endif
+	r_line_completion_init (&line->completion, 4096);
+	return line;
+}
+
+R_API void r_line_free(RLine *line) {
+	if (line) {
+		free (line->state.prompt);
+		r_list_free (line->kill_ring);
+		r_line_hist_free (line);
+		r_line_completion_clear (&line->completion);
+		free (line);
+	}
+}
+
+R_API void r_line_clipboard_push(RLine *line, const char *str) {
+	R_RETURN_IF_FAIL (line && str);
+	line->kill_ring_ptr += 1;
+	r_list_insert (line->kill_ring, line->kill_ring_ptr, strdup (str));
+}
+
+// handle const or dynamic prompts?
+R_API void r_line_set_prompt(RLine *line, const char *prompt) {
+	R_RETURN_IF_FAIL (line && prompt);
+	free (line->state.prompt);
+	line->state.prompt = strdup (prompt);
+	line->state.cb_fkey = line->cons->cb_fkey;
+}
+
+// handle const or dynamic prompts?
+R_API char *r_line_get_prompt(RLine *line) {
+	R_RETURN_VAL_IF_FAIL (line, NULL);
+	return strdup (line->state.prompt);
+}
+
+R_API void r_line_completion_init(RLineCompletion *completion, size_t args_limit) {
+	completion->run = NULL;
+	completion->run_user = NULL;
+	completion->args_limit = args_limit;
+	RVecCString_init (&completion->args);
+}
+
+R_API void r_line_completion_push(RLineCompletion *completion, const char *str) {
+	R_RETURN_IF_FAIL (completion && str);
+	if (completion->quit) {
+		return;
+	}
+	if (RVecCString_length (&completion->args) < completion->args_limit) {
+		char *s = strdup (str);
+		if (s) {
+			RVecCString_push_back (&completion->args, &s);
+		}
+	} else {
+		completion->quit = true;
+		R_LOG_WARN ("Maximum completion capacity reached, increase scr.maxtab");
+	}
+}
+
+R_API void r_line_completion_set(RLineCompletion *completion, int argc, const char **argv) {
+	R_RETURN_IF_FAIL (completion && (argc >= 0));
+	r_line_completion_clear (completion);
+	if (argc > completion->args_limit) {
+		argc = completion->args_limit;
+		R_LOG_DEBUG ("Maximum completion capacity reached, increase scr.maxtab (%d %d)",
+				argc, completion->args_limit);
+	}
+	size_t count = R_MIN (argc, completion->args_limit);
+	if (RVecCString_reserve (&completion->args, count)) {
+		int i;
+		for (i = 0; i < count; i++) {
+			r_line_completion_push (completion, argv[i]);
+		}
+	}
+}
+
+R_API void r_line_completion_clear(RLineCompletion *completion) {
+	R_RETURN_IF_FAIL (completion);
+	completion->quit = false;
+	RVecCString_clear (&completion->args);
+	RVecCString_shrink_to_fit (&completion->args);
+}
