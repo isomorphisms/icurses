@@ -1,0 +1,38 @@
+name: Import pinned libr_cons source
+on:
+  push:
+    branches: [import/libr-cons]
+    paths:
+      - _/import_libr_cons.py
+      - .github/workflows/import-libr-cons.yml
+permissions:
+  contents: write
+concurrency:
+  group: import-libr-cons
+  cancel-in-progress: false
+jobs:
+  import:
+    if: github.repository == 'isomorphisms/icurses'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out import branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+      - name: Import and verify all selected source bytes
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python3 _/import_libr_cons.py
+          git add -- libr_cons
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Import complete pinned radare2 libr_cons source snapshot'
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          printf 'Imported source commit: %s\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
